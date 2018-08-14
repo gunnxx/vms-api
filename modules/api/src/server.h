@@ -13,7 +13,6 @@ class Server {
  public:
     Server();
     void run(int port = 8000);
-    void shutdown();;
 
  private:
     static void _exec_request(const crow::request &req,
@@ -22,7 +21,7 @@ class Server {
 
     crow::SimpleApp _app;
 
-    RQ::RQServer qserver(3);
+    RQ::RQServer _qserver(3);	// 3 threads
 };
 
 }  // namespace api

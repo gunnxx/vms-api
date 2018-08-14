@@ -1,6 +1,7 @@
 #ifndef REQ_QUEUE
 #define REQ_QUEUE
 
+#include <stdexcept>
 #include <string>
 #include <queue>
 #include <vector>
@@ -8,18 +9,17 @@
 #include <mutex>
 #include <chrono>
 
-#include "crow/crow_all.h"
-
 namespace RQ {
 
 struct Request {
-	uint32_t id;
+	bool exist = false;
+  long long id;
 	std::string method;
 	std::string body;
 };
 
 struct Response {
-	uint32_t id;
+	long long id;
 	int code;
 	std::string body;
 };
@@ -34,6 +34,8 @@ class ThreadQueue {
   	datatype front();			    // Return front element
   	bool empty();				      // true if empty
 
+    datatype popIfExist();    // Check empty() -> if not empty then pop() [prevent race condition]
+
   private:
   	std::queue<datatype> elems;
   	std::mutex m;
@@ -41,31 +43,30 @@ class ThreadQueue {
 
 class RQServer {
   public:
-	RQServer (int threads = 3);
+	RQServer (int threads);
+  ~RQServer();
 
 	ThreadQueue <Request>  *_getRequestQueue();
 	ThreadQueue <Response> *_getResponseQueue();
 
+  bool _getShutDownStatus();
 	void run();
-	void _shutDown();
   
   private:
-  	bool _shutdown = false;
-
   	int _threads;
-  	std::vector <std::thread *> active_threads;
+  	std::vector <std::thread> active_threads;
 
   	ThreadQueue <Request>  _request_queue;
   	ThreadQueue <Response> _response_queue;
 
-  	void _threadCallback();
+  	bool _shutdown;
 };
 
 class RQClient {
   public:
   	RQClient ();
 
-  	ack connect (RQServer qserver);
+  	ack connect (RQServer &qserver);
   	ack publish (Request req);
 
   	Response findResponse (uint32_t req_id);
@@ -77,23 +78,55 @@ class RQClient {
 
 } // namespace RQ
 
-#endif
+/* -------------
+    ThreadQueue
+   ------------- */
 
-/*
-[ DONE ]
-1. Made class queue (thread-safe)
-	- #include <mutex>
-	- push() method just use push()
-	- pop() method combine front() and pop() from std::queue
-	- front() method just use front() method
-[ DONE ]
-2. Create threads with each thread :
-	- while true, check queue
-	- call method according to request.method
-	- get the response
-	- append the response to the _response_queue
-[ X ]
-3. Add timeout to findResponse() always use front() method
-[ DONE ] -> check _shutDown()
-4. How to close threads
-*/
+template <class datatype>
+void RQ::ThreadQueue<datatype>::push (datatype elem) {
+  std::lock_guard<std::mutex> lock(m);
+  elems.push(elem);
+}
+
+template <class datatype>
+datatype RQ::ThreadQueue<datatype>::pop() {
+  std::lock_guard<std::mutex> lock(m);
+  
+  if(elems.empty())
+    throw std::out_of_range("Empty queue. Can't call method pop().\n");
+
+  datatype elem = elems.front();
+  elems.pop();
+  return elem;
+}
+
+template <class datatype>
+datatype RQ::ThreadQueue<datatype>::front () {
+  std::lock_guard<std::mutex> lock(m);
+
+  if(elems.empty())
+    throw std::out_of_range("Empty queue. Can't call method front().\n");
+
+  return elems.front();
+}
+
+template <class datatype>
+bool RQ::ThreadQueue<datatype>::empty () {
+  std::lock_guard<std::mutex> lock(m);
+  return elems.empty();
+}
+
+template <class datatype>
+datatype RQ::ThreadQueue<datatype>::popIfExist () {
+  std::lock_guard<std::mutex> lock(m);
+
+  datatype elem;
+  if(!elems.empty()){ // If not empty
+    elem = elems.front();
+    elem.exist = true;
+    elems.pop();
+  }
+  return elem;
+}
+
+#endif

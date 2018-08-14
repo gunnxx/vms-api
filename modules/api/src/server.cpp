@@ -6,13 +6,17 @@ namespace api = vms::api;
 auto console = spdlog::stdout_color_mt("server");
 // api::Session session;
 
+// helper function
+long long get_microtime_now();
+
 api::Server::Server() {
   CROW_ROUTE(_app, "/<string>").methods("POST"_method)(_exec_request);
-
-  qserver.run();
 }
 
-void api::Server::run(int port) { _app.port(port).multithreaded().run(); }
+void api::Server::run(int port) {
+  _qserver.run();
+  _app.port(port).multithreaded().run();
+}
 
 void api::Server::_exec_request(
     const crow::request &req,
@@ -22,7 +26,7 @@ void api::Server::_exec_request(
   RQ::RQClient qclient;
 
   // Get request body
-  request.id     = reinterpret_cast<uint32_t>(&qclient);
+  request.id     = get_microtime_now();
   request.method = method;
   request.body   = req.body;
 
@@ -38,6 +42,7 @@ void api::Server::_exec_request(
   res.end();
 }
 
-void api::Server::shutdown(){
-  qserver._shutDown();
+long long get_microtime_now(){
+  auto ts = chrono::time_point_cast<chrono::microseconds>(chrono::system_clock::now());
+  return static_cast<long long>(chrono::system_clock::to_time_t(ts));
 }
