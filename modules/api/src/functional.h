@@ -168,36 +168,3 @@ RQ::Response _live_stream(RQ::Request req) {
   res.body = crow::json::dump(json_resp);
   return res;
 }
-
-RQ::Response _sdk_playback(RQ::Request req) {
-  RQ::Response res;
-  res.id = req.id;
-
-  crow::json::wvalue json_resp;
-  json_resp["ok"] = false;
-
-  try {
-    auto data = crow::json::load(req.body);
-    auto vms  = _login(data);
-
-    vms -> sdk_playback(data["camera_code"].s(),
-                        data["start_time"].s(),
-                        data["end_time"].s());
-
-    json_resp["ok"]   = true;
-    json_resp["code"] = "sdk_playback/success";
-  } catch (std::invalid_argument err) {
-    console->error(err.what());
-    json_resp["code"]    = "sdk_playback/invalid-argument";
-    json_resp["message"] = "Argument is invalid.";
-    res.code = 400;
-  } catch (std::runtime_error err) {
-    console->error(err.what());
-    json_resp["code"]    = "sdk_playback/failed";
-    json_resp["message"] = "Failed to find sdk playback.";
-    res.code = 400;
-  }
-
-  res.body = crow::json::dump(json_resp);
-  return res;
-}

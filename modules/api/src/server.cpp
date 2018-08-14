@@ -2,14 +2,15 @@
 #include "spdlog/spdlog.h"
 
 namespace api = vms::api;
-
-auto console = spdlog::stdout_color_mt("server");
-// api::Session session;
+namespace chrono = std::chrono;
 
 // helper function
 long long get_microtime_now();
 
-api::Server::Server() {
+// static init
+RQ::RQServer api::Server::_qserver(3); // 3-threads
+
+api::Server::Server() { 
   CROW_ROUTE(_app, "/<string>").methods("POST"_method)(_exec_request);
 }
 
@@ -20,7 +21,7 @@ void api::Server::run(int port) {
 
 void api::Server::_exec_request(
     const crow::request &req,
-    const crow::response &res,
+    crow::response &res,
     std::string method) {
   RQ::Request request;
   RQ::RQClient qclient;
@@ -31,14 +32,14 @@ void api::Server::_exec_request(
   request.body   = req.body;
 
   // Append to RQServer queue
-  qclient.connect(qserver);
+  qclient.connect(_qserver);
   qclient.publish(request);
   
   // Find (wait) and fill in response
-  RQ::Response response = qclient.findResponse(request.id);
-  res.code = response.code;
+  RQ::Response resp = qclient.findResponse(request.id);
+  res.code = resp.code;
   res.add_header("Content-Type", "application/json");
-  res.write(response.body)
+  res.write(resp.body);
   res.end();
 }
 

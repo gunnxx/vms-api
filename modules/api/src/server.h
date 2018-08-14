@@ -16,12 +16,12 @@ class Server {
 
  private:
     static void _exec_request(const crow::request &req,
-                              const crow::response &res,
+                              crow::response &res,
                               std::string method);
 
     crow::SimpleApp _app;
 
-    RQ::RQServer _qserver(3);	// 3 threads
+    static RQ::RQServer _qserver;
 };
 
 }  // namespace api

@@ -24,9 +24,6 @@ void _threadCallback (RQ::RQServer *qserver) {
 			else if(req.method == "live-stream")
 				res = _live_stream(req);
 			
-			else if(req.method == "sdk-playback")
-				res = _sdk_playback(req);
-
 			else { // Method not recognized
 				res.id   = req.id;
 				res.body = "METHOD NOT RECOGNIZED";
